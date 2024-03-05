@@ -1,0 +1,99 @@
+use core::slice;
+use std::{ptr::null_mut, io::Write};
+
+use capstone::Capstone;
+use kvm_bindings::{kvm_userspace_memory_region, KVM_MEM_LOG_DIRTY_PAGES};
+use kvm_ioctls::{DeviceFd, VmFd, Kvm, VcpuFd};
+use log::debug;
+
+type Result<T> = Result<T, kvm_ioctls::Error>;
+
+pub trait VmBuilder {
+    fn build_vm(&self, slot: u32, mem_size: usize, guest_addr: u64) -> Result<Vm>;
+}
+
+/// Wrapper around VM Creation for KVM, intended to refactor code, maybe useless idk
+impl VmBuilder for Kvm {
+    fn build_vm(&self, slot: u32, mem_size: usize, guest_addr: u64, asm_code: &[u8]) -> Result<Vm> {
+        let vm: VmFd = self.create_vm()?;
+
+        let load_addr: *mut u8 = unsafe {
+            libc::mmap(
+                null_mut(),
+                mem_size,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_ANONYMOUS | libc::MAP_SHARED | libc::MAP_NORESERVE,
+                -1,
+                0
+            ) as *mut u8
+        };
+
+        let mem_region = kvm_userspace_memory_region {
+            slot,
+            guest_phys_addr: guest_addr,
+            memory_size: mem_size as u64,
+            userspace_addr: load_addr as u64,
+            flags: KVM_MEM_LOG_DIRTY_PAGES
+        };
+
+        unsafe {
+            vm.set_user_memory_region(mem_region)?;
+            debug!("VM Userspace memory region set @ 0x{:X}", mem_region.userspace_addr);
+            debug!("{:?}", mem_region);
+
+            let mut vm_mem = slice::from_raw_parts_mut(load_addr, mem_size);
+            let written = vm_mem.write(asm_code)?;
+            debug!("Code written");
+        }
+
+        let vcpu_fd = vm.create_vcpu(0)?;
+        debug!("vCPU added");
+        debug!("{vcpu_fd:?}");
+        // Might be asm_code dependant
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            let mut vcpu_sregs = vcpu_fd.get_sregs().unwrap();
+            vcpu_sregs.cs.base = 0;
+            vcpu_sregs.cs.selector = 0;
+            vcpu_fd.set_sregs(&vcpu_sregs).unwrap();
+            debug!("Special registers set:");
+            debug!("{vcpu_sregs:?}");
+
+            let mut vcpu_regs = vcpu_fd.get_regs().unwrap();
+            vcpu_regs.rip = guest_addr;
+            vcpu_regs.rax = 2;
+            vcpu_regs.rbx = 3;
+            vcpu_regs.rflags = 2;
+            vcpu_fd.set_regs(&vcpu_regs).unwrap();
+        }
+
+        Ok(
+            Self {
+                vm_fd,
+                vcpu_fd,
+                load_addr,
+                guest_phys_addr,
+                devices_fd: vec![],
+        })
+    }
+}
+
+#[allow(dead_code)]
+struct Vm<'a> {
+    vm_fd: VmFd,
+    vcpu_fd: VcpuFd,
+    load_addr: *mut u8,
+    guest_phys_addr: usize,
+    devices_fd: Vec<DeviceFd>,
+}
+
+impl<'a> Vm<'a> {
+    pub fn new() -> Self {
+        todo!()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VmCreationError {
+    KvmError(kvm_ioctls::Error)
+}
