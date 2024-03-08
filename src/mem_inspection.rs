@@ -20,6 +20,31 @@ pub fn init_cs_disass_x86_64() -> Capstone {
     todo!()
 }
 
+fn disasm_count(code: &[u8], addr: u64, count: usize) {
+    let mut _o_cs: Option<Capstone> = None;
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        _o_cs = Some(init_cs_disass_x86_64());
+    }
+    let mut cs = _o_cs.expect("Architecture not supported yet");
+    
+    //TMP
+    cs.set_skipdata(true).expect("How the fuck did CapStone set_skipdata failed");
+
+    // TOFIX
+    let insns = cs.disasm_all(code, addr).expect("Disassembly failed");
+    
+    let mut printed = 0;
+    for i in insns.as_ref() {
+        if printed == count {
+            break;
+        }
+        debug!("{} {:x?}", i, i.bytes());
+        printed+=1;
+    }
+}
+
 fn disasm_all(code: &[u8], addr: u64) {
     let mut _o_cs: Option<Capstone> = None;
 
@@ -64,15 +89,13 @@ pub trait DisASM {
 
 impl DisASM for &[u8] {
     fn disasm_all(&self, addr: u64) { disasm_all(&self, addr); }
-    #[allow(unused)]
     fn disasm_count(&self, addr: u64, count: usize) {
-        todo!()
+        disasm_count(&self, addr, count)
     }
 }
 impl DisASM for &mut [u8] {
     fn disasm_all(&self, addr: u64) { disasm_all(&self, addr); }
-    #[allow(unused)]
     fn disasm_count(&self, addr: u64, count: usize) {
-        todo!()
+        disasm_count(&self, addr, count)
     }
 }
