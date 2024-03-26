@@ -3,7 +3,7 @@ use core::slice;
 use capstone::prelude::*;
 
 #[allow(unused)]
-use log::{debug, info, warn, error};
+use log::{ debug, info, warn, error };
 
 #[allow(unused, unreachable_code)]
 pub fn init_cs_disass_x86_64() -> Capstone {
@@ -28,20 +28,18 @@ fn disasm_count(code: &[u8], addr: u64, count: usize) {
         _o_cs = Some(init_cs_disass_x86_64());
     }
     let mut cs = _o_cs.expect("Architecture not supported yet");
-    
+
     //TMP
     cs.set_skipdata(true).expect("How the fuck did CapStone set_skipdata failed");
 
     // TOFIX
     let insns = cs.disasm_all(code, addr).expect("Disassembly failed");
-    
-    let mut printed = 0;
-    for i in insns.as_ref() {
+
+    for (printed, i) in insns.as_ref().iter().enumerate() {
         if printed == count {
             break;
         }
         debug!("{} {:x?}", i, i.bytes());
-        printed+=1;
     }
 }
 
@@ -53,24 +51,24 @@ fn disasm_all(code: &[u8], addr: u64) {
         _o_cs = Some(init_cs_disass_x86_64());
     }
     let mut cs = _o_cs.expect("Architecture not supported yet");
-    
+
     //TMP
     cs.set_skipdata(true).expect("How the fuck did CapStone set_skipdata failed");
 
     // TOFIX
     let insns = cs.disasm_all(code, addr).expect("Disassembly failed");
-    
+
     for i in insns.as_ref() {
         debug!("{} {:x?}", i, i.bytes());
     }
 }
 
 pub trait MemRegion {
-    unsafe fn mem_region<'a>(&'a self, len: usize) -> Option<&'a [u8]>;
-} 
+    unsafe fn mem_region(&self, len: usize) -> Option<&[u8]>;
+}
 
 impl MemRegion for *const u8 {
-    unsafe fn mem_region<'a>(&'a self, len: usize) -> Option<&'a [u8]> {
+    unsafe fn mem_region(&self, len: usize) -> Option<&[u8]> {
         if self.is_null() {
             return None;
         }
@@ -88,14 +86,18 @@ pub trait DisASM {
 }
 
 impl DisASM for &[u8] {
-    fn disasm_all(&self, addr: u64) { disasm_all(&self, addr); }
+    fn disasm_all(&self, addr: u64) {
+        disasm_all(self, addr);
+    }
     fn disasm_count(&self, addr: u64, count: usize) {
-        disasm_count(&self, addr, count)
+        disasm_count(self, addr, count)
     }
 }
 impl DisASM for &mut [u8] {
-    fn disasm_all(&self, addr: u64) { disasm_all(&self, addr); }
+    fn disasm_all(&self, addr: u64) {
+        disasm_all(self, addr);
+    }
     fn disasm_count(&self, addr: u64, count: usize) {
-        disasm_count(&self, addr, count)
+        disasm_count(self, addr, count)
     }
 }

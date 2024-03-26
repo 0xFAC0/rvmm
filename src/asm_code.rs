@@ -14,8 +14,8 @@ pub fn asm_mmio_rw_test() -> &'static [u8] {
             0xf4, /* hlt */
         ];
     }
-    if asm_code.len() == 0 {
+    if asm_code.is_empty() {
         todo!("Architecture not implemented yet");
     }
-    return asm_code;
+    asm_code
 }

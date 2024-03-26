@@ -1,6 +1,7 @@
-use kvm_ioctls::{DeviceFd, VcpuFd, VmFd};
+use kvm_ioctls::{VcpuFd, VmFd};
+use self::serial::SerialPort;
 
-use self::{ram::Ram, serial::SerialPort};
+use self::ram::Ram;
 
 pub mod vm_builder;
 pub mod vm;

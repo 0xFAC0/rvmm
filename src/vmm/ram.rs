@@ -26,7 +26,7 @@ impl BuildRam for VmFd {
             debug!("Unaligned memory size: {mem_size}");
             mem_size += mem_size % 0x10;
         }
-        RamBuilder {vm_fd: &self, host_load_addr: None, mem_size, regions: vec![] }
+        RamBuilder {vm_fd: self, host_load_addr: None, mem_size, regions: vec![] }
     }
 }
 
@@ -34,10 +34,9 @@ impl BuildRam for VmFd {
 #[allow(unused)]
 pub struct RamBuilder<'a> {
     vm_fd: &'a VmFd,
-    /// Host userspace address where the guest memory is allocated. Not GPA
     host_load_addr: Option<u64>,
     mem_size: usize,
-    regions: Vec<(GuestAddress, usize)>, // Vec<(addr_start, size)>
+    regions: Vec<(GuestAddress, usize)>
 }
 
 #[allow(unused)]
@@ -51,9 +50,6 @@ impl<'a> RamBuilder<'a> {
     }
 
     pub fn build(self) -> Ram {
-        // let gm = GuestMemoryMmap::<()>::from_ranges(self.regions.as_ref())
-        //     .expect("Could not create guest memory");
-        // Careful, slot must change
         let host_userspace_addr = self.kvm_allocate_region(0, None, 0, self.mem_size as u64);
         Ram {
             load_addr: host_userspace_addr,
@@ -86,11 +82,12 @@ impl<'a> RamBuilder<'a> {
                 ) as u64
             }
         };
-        if userspace_addr <= 0 {
+        if userspace_addr == 0 {
             panic!("Mmap failed (TODO errno) ret={userspace_addr}");
         }
 
         debug!("Addr: {:x?}", userspace_addr as *mut u8);
+        
         let mem_region = kvm_userspace_memory_region {
             slot,
             userspace_addr,
